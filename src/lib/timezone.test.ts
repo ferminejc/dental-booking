@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  addDaysToManilaDate,
+  formatDateLabel,
+  formatTimeLabel,
   manilaCalendarDaysBetween,
   manilaDateTimeToUtc,
+  manilaTimeFromUrlSegment,
+  manilaTimeToUrlSegment,
   manilaWeekday,
   utcToManilaDateString,
   utcToManilaTimeString,
@@ -60,5 +65,56 @@ describe("manilaCalendarDaysBetween", () => {
 
   it("returns a negative count for an earlier date", () => {
     expect(manilaCalendarDaysBetween("2026-07-15", "2026-07-14")).toBe(-1);
+  });
+});
+
+describe("addDaysToManilaDate", () => {
+  it("adds days within the same month", () => {
+    expect(addDaysToManilaDate("2026-07-15", 3)).toBe("2026-07-18");
+  });
+
+  it("rolls over into the next month", () => {
+    expect(addDaysToManilaDate("2026-07-30", 3)).toBe("2026-08-02");
+  });
+
+  it("subtracts days with a negative offset", () => {
+    expect(addDaysToManilaDate("2026-07-15", -1)).toBe("2026-07-14");
+  });
+
+  it("is the inverse of manilaCalendarDaysBetween", () => {
+    const a = "2026-07-15";
+    const b = "2026-08-14";
+    expect(addDaysToManilaDate(a, manilaCalendarDaysBetween(a, b))).toBe(b);
+  });
+});
+
+describe("formatDateLabel", () => {
+  it("formats a Manila calendar date as a short weekday + month + day label", () => {
+    expect(formatDateLabel("2026-07-15")).toBe("Wed, Jul 15");
+  });
+});
+
+describe("formatTimeLabel", () => {
+  it("formats morning times", () => {
+    expect(formatTimeLabel("09:00")).toBe("9:00 AM");
+  });
+
+  it("formats afternoon times", () => {
+    expect(formatTimeLabel("14:30")).toBe("2:30 PM");
+  });
+
+  it("formats noon as 12 PM", () => {
+    expect(formatTimeLabel("12:00")).toBe("12:00 PM");
+  });
+
+  it("formats midnight as 12 AM", () => {
+    expect(formatTimeLabel("00:00")).toBe("12:00 AM");
+  });
+});
+
+describe("manilaTimeToUrlSegment / manilaTimeFromUrlSegment", () => {
+  it("round-trips a time through the URL representation", () => {
+    expect(manilaTimeToUrlSegment("09:30")).toBe("0930");
+    expect(manilaTimeFromUrlSegment("0930")).toBe("09:30");
   });
 });

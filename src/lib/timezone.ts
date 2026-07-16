@@ -57,3 +57,46 @@ export function manilaCalendarDaysBetween(a: ManilaDateString, b: ManilaDateStri
   const utcB = Date.UTC(db.year, db.month - 1, db.day);
   return Math.round((utcB - utcA) / 86_400_000);
 }
+
+// date + days, as a calendar date string. Timezone-free — Date.UTC normalizes
+// out-of-range days/months automatically (e.g. day 32 rolls into next month).
+export function addDaysToManilaDate(date: ManilaDateString, days: number): ManilaDateString {
+  const { year, month, day } = parseDateString(date);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return `${shifted.getUTCFullYear()}-${pad2(shifted.getUTCMonth() + 1)}-${pad2(shifted.getUTCDate())}`;
+}
+
+// "2026-07-15" -> "Wed, Jul 15". Anchored at UTC midnight purely to reuse
+// Intl's formatting with an explicit timeZone: "UTC" pin — there's no actual
+// zone conversion happening, just extracting the same y/m/d the string
+// already represents into a localized label.
+export function formatDateLabel(date: ManilaDateString): string {
+  const { year, month, day } = parseDateString(date);
+  return new Intl.DateTimeFormat("en-PH", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+// "09:00" -> "9:00 AM". Pure string/number formatting, no zone conversion —
+// the input is already a Manila-local wall-clock time.
+export function formatTimeLabel(time: string): string {
+  const [hourStr, minute] = time.split(":");
+  const hour = Number(hourStr);
+  const period = hour < 12 ? "AM" : "PM";
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${minute} ${period}`;
+}
+
+// Colon-free time representation for URL path segments — ":" is a valid but
+// easy-to-mishandle character in a path segment, so routes use "0900" and
+// convert at the boundary.
+export function manilaTimeToUrlSegment(time: string): string {
+  return time.replace(":", "");
+}
+
+export function manilaTimeFromUrlSegment(segment: string): string {
+  return `${segment.slice(0, 2)}:${segment.slice(2)}`;
+}

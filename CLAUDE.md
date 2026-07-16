@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Online appointment booking for a small PH dental clinic. Full requirements, data model, and the phase-by-phase build plan live in `SPEC.md` — read it before making architectural decisions, it is the source of truth, not this file.
 
-**Status: Phases 1–2.** Scaffold, DB schema, migrations, seed script, and the pure slot-generation engine (`src/lib/slots.ts` + `src/lib/timezone.ts`) exist, with a Vitest unit suite. There is no app UI beyond the default Next.js starter page, no Server Actions, no admin auth/dashboard, no notifications, and no E2E tests yet. Don't assume any of that exists — check before referencing it.
+**Status: Phases 1–3.** Scaffold, DB schema, migrations, seed script, the pure slot-generation engine (`src/lib/slots.ts` + `src/lib/timezone.ts`), and the public booking flow end-to-end (services list, date/slot picker, booking form, cancel form, Server Actions in `src/lib/actions.ts`, Zod validation in `src/lib/validation.ts`) exist, with a Vitest unit suite plus one integration test (`src/lib/booking-repo.integration.test.ts`) that fires two concurrent bookings for the same slot against a real test database and asserts the exclusion constraint stops the second. There is no admin auth/dashboard, no notifications, and no E2E tests yet. Don't assume any of that exists — check before referencing it.
 
 ## Commands
 
@@ -14,16 +14,20 @@ Online appointment booking for a small PH dental clinic. Full requirements, data
 npm run dev                # dev server (Turbopack)
 npm run build               # production build (Turbopack)
 npm run lint                # eslint
-npm run test                # vitest run — single pass, use this for CI/"did it work" checks
-npm run test:watch          # vitest — interactive watch mode for local dev
+npm run test                # vitest run, excluding *.integration.test.ts — single pass, use this for CI/"did it work" checks
+npm run test:watch          # vitest — interactive watch mode for local dev, same integration-test exclusion
+npm run test:integration    # vitest run src/lib/booking-repo.integration.test.ts — needs DATABASE_URL_TEST migrated (npm run db:migrate:test)
 
 npm run db:generate          # drizzle-kit generate — diff src/db/schema.ts into a new migration
 npm run db:migrate           # drizzle-kit migrate — apply pending migrations in drizzle/
+npm run db:migrate:test      # drizzle-kit migrate --config=drizzle.config.test.ts — applies the same migrations to DATABASE_URL_TEST
 npm run db:seed              # tsx src/db/seed.ts — wipe and reseed clinic settings/services/appointments
 npm run db:studio            # drizzle-kit studio
 ```
 
-Vitest config (`vitest.config.ts`) scopes `test.include` to `src/**/*.test.ts` — deliberately narrower than Vitest's default glob, which also matches `*.spec.ts`, to avoid colliding with Phase 5's future Playwright specs. Playwright itself isn't installed yet (Phase 5 per `SPEC.md`).
+Vitest config (`vitest.config.ts`) scopes `test.include` to `src/**/*.test.ts` — deliberately narrower than Vitest's default glob, which also matches `*.spec.ts`, to avoid colliding with Phase 5's future Playwright specs. Playwright itself isn't installed yet (Phase 5 per `SPEC.md`). It also aliases `@` to `./src` (mirroring `tsconfig.json`'s path) since Vitest doesn't read tsconfig paths on its own — needed once `src/lib/booking-repo.ts` and friends started using `@/db/schema`-style imports. The `test`/`test:watch` scripts pass `--exclude "**/*.integration.test.ts"` so the fast/CI path never needs `DATABASE_URL_TEST` connectivity; `test:integration` targets that file explicitly and bypasses the exclude.
+
+**`drizzle-orm`'s `neon-http` driver never throws a `NeonDbError` directly** — it always wraps driver errors in a `DrizzleQueryError`, with the real error (SQLSTATE `code` and all) on `.cause`. `src/lib/booking-repo.ts`'s `asNeonDbError` helper unwraps this; a bare `err instanceof NeonDbError` check will never match and was the actual bug the concurrent-booking integration test caught the first time it ran against a real database.
 
 Package manager is **npm** (`package-lock.json`) — don't introduce pnpm/yarn lockfiles or commands. The project started on pnpm during initial scaffolding and was switched to npm early in Phase 1; if you see any stray `pnpm-lock.yaml` or `pnpm-workspace.yaml`, they're leftovers to delete, not the source of truth. npm's newer install-script approval gate means new native deps (like a future db driver with prebuilt binaries) may need `npm approve-scripts --all` after `npm install` before they'll build.
 
@@ -74,4 +78,4 @@ Other resolved ambiguities worth knowing: max-advance-days is **inclusive** (a d
 
 ## Migrations
 
-Two migrations exist: `0000_init.sql` (drizzle-kit generated, all four tables) and `0001_btree_gist_exclusion_constraint.sql` (hand-written, see above). Both are tracked in `drizzle/meta/_journal.json`. Migrations run against `DATABASE_URL` only — the test database (`DATABASE_URL_TEST` in `.env.local`) has not been migrated yet; that's expected to happen when Phase 3's integration tests are set up.
+Two migrations exist: `0000_init.sql` (drizzle-kit generated, all four tables) and `0001_btree_gist_exclusion_constraint.sql` (hand-written, see above). Both are tracked in `drizzle/meta/_journal.json`. `npm run db:migrate` applies them to `DATABASE_URL`; `npm run db:migrate:test` (via `drizzle.config.test.ts`) applies the same migrations to `DATABASE_URL_TEST`, which the Phase 3 integration test depends on.
