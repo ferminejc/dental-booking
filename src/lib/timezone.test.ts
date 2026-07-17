@@ -8,6 +8,7 @@ import {
   manilaTimeFromUrlSegment,
   manilaTimeToUrlSegment,
   manilaWeekday,
+  mondayOfManilaWeek,
   utcToManilaDateString,
   utcToManilaTimeString,
 } from "./timezone";
@@ -51,6 +52,20 @@ describe("manilaWeekday", () => {
 
   it("returns 'sun' for a Sunday", () => {
     expect(manilaWeekday("2026-07-19")).toBe("sun");
+  });
+});
+
+describe("mondayOfManilaWeek", () => {
+  it("returns the preceding Monday for a midweek date", () => {
+    expect(mondayOfManilaWeek("2026-07-15")).toBe("2026-07-13"); // Wed -> Mon
+  });
+
+  it("returns the Monday of the same week for a Sunday (week is Mon-Sun)", () => {
+    expect(mondayOfManilaWeek("2026-07-19")).toBe("2026-07-13"); // Sun -> Mon 6 days earlier
+  });
+
+  it("returns itself for a Monday", () => {
+    expect(mondayOfManilaWeek("2026-07-13")).toBe("2026-07-13");
   });
 });
 

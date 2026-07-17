@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Online appointment booking for a small PH dental clinic. Full requirements, data model, and the phase-by-phase build plan live in `SPEC.md` — read it before making architectural decisions, it is the source of truth, not this file.
 
-**Status: Phases 1–3.** Scaffold, DB schema, migrations, seed script, the pure slot-generation engine (`src/lib/slots.ts` + `src/lib/timezone.ts`), and the public booking flow end-to-end (services list, date/slot picker, booking form, cancel form, Server Actions in `src/lib/actions.ts`, Zod validation in `src/lib/validation.ts`) exist, with a Vitest unit suite plus one integration test (`src/lib/booking-repo.integration.test.ts`) that fires two concurrent bookings for the same slot against a real test database and asserts the exclusion constraint stops the second. There is no admin auth/dashboard, no notifications, and no E2E tests yet. Don't assume any of that exists — check before referencing it.
+**Status: Phases 1–4.** Scaffold, DB schema, migrations, seed script, the pure slot-generation engine (`src/lib/slots.ts` + `src/lib/timezone.ts`), the public booking flow end-to-end (services list, date/slot picker, booking form, cancel form, Server Actions in `src/lib/actions.ts`, Zod validation in `src/lib/validation.ts`), and the admin auth + dashboard (`/admin/*` — iron-session login, appointment list/week view with status transitions, blocked-time management, services CRUD, weekly clinic-hours editor; see "Admin auth + dashboard" below) all exist, with a Vitest unit suite plus one integration test (`src/lib/booking-repo.integration.test.ts`) that fires two concurrent bookings for the same slot against a real test database and asserts the exclusion constraint stops the second. There are no notifications and no E2E tests yet. Don't assume any of that exists — check before referencing it.
 
 ## Commands
 
@@ -23,6 +23,8 @@ npm run db:migrate           # drizzle-kit migrate — apply pending migrations 
 npm run db:migrate:test      # drizzle-kit migrate --config=drizzle.config.test.ts — applies the same migrations to DATABASE_URL_TEST
 npm run db:seed              # tsx src/db/seed.ts — wipe and reseed clinic settings/services/appointments
 npm run db:studio            # drizzle-kit studio
+
+npm run auth:hash -- <password>   # tsx src/lib/generate-password-hash.ts — prints an ADMIN_PASSWORD_HASH value for .env.local
 ```
 
 Vitest config (`vitest.config.ts`) scopes `test.include` to `src/**/*.test.ts` — deliberately narrower than Vitest's default glob, which also matches `*.spec.ts`, to avoid colliding with Phase 5's future Playwright specs. Playwright itself isn't installed yet (Phase 5 per `SPEC.md`). It also aliases `@` to `./src` (mirroring `tsconfig.json`'s path) since Vitest doesn't read tsconfig paths on its own — needed once `src/lib/booking-repo.ts` and friends started using `@/db/schema`-style imports. The `test`/`test:watch` scripts pass `--exclude "**/*.integration.test.ts"` so the fast/CI path never needs `DATABASE_URL_TEST` connectivity; `test:integration` targets that file explicitly and bypasses the exclude.
@@ -38,8 +40,8 @@ Fixed by `SPEC.md`; treat any deviation as something to flag, not decide unilate
 - Next.js 15 (App Router, Server Actions), TypeScript strict mode
 - Tailwind CSS + shadcn/ui — initialized on **Radix** primitives (`radix-ui` package), not the newer Base UI preset shadcn's CLI defaults to. If you re-run `shadcn init`, pass `-b radix` or it will silently switch the primitive library and require reinstalling every component.
 - Drizzle ORM + Postgres (Neon), using the `drizzle-orm/neon-http` driver (`@neondatabase/serverless`) — this is the serverless/edge-compatible driver, not `node-postgres`.
-- Zod for validation (not yet introduced — will land in Phase 3, in a single `src/lib/validation.ts` file per the file-organization convention below).
-- Admin auth: iron-session + env-var credentials, no auth framework (Phase 4, not built).
+- Zod for validation, schemas shared between client and server — a single `src/lib/validation.ts` file per the file-organization convention below (booking and admin schemas both live there).
+- Admin auth: iron-session + env-var credentials (`ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`), no auth framework — see "Admin auth + dashboard" below.
 - date-fns + date-fns-tz for all Asia/Manila conversions — built in `src/lib/timezone.ts` (Phase 2). `src/db/seed.ts` still uses its own manual UTC+8 arithmetic and was deliberately left as-is (it predates this and rewriting a seed script wasn't in scope for Phase 2) — new code elsewhere should use `timezone.ts`, not replicate the manual offset math.
 - Email: Resend if `RESEND_API_KEY` is set, else a console-logging fallback (Phase 5, not built).
 - Vitest (unit/integration) — installed, pinned to the 3.x line (`^3.2.7`) rather than latest (4.x) specifically because 4.x declares `vite` as a required peer dependency and this project has no other use for Vite (Next.js uses Turbopack); 3.x has no such peer. Playwright (E2E) — not installed yet (Phase 5).
@@ -75,6 +77,16 @@ Two things to know before modifying it:
 - **Overlap checks use the candidate's exact duration, never rounded up to a slot multiple.** SPEC's "occupies ceil(duration/30) consecutive slots" describes *why* a multi-slot appointment can block a later slot-start, not a literal instruction to round the blocking window — rounding would cause false rejections whenever a conflicting block/appointment isn't itself slot-aligned (see the non-slot-aligned-block test case in `slots.test.ts`, which is written specifically to catch a rounded-duration regression).
 
 Other resolved ambiguities worth knowing: max-advance-days is **inclusive** (a date exactly `maxAdvanceDays` out is bookable); appointment-status filtering (only `pending`/`confirmed` block availability) happens *inside* `generateAvailableSlots`, not left to the caller's DB query.
+
+## Admin auth + dashboard
+
+Single admin, no user accounts. `middleware.ts` (matcher `/admin/:path*`) is the primary gate — it unseals the iron-session cookie via `getIronSession(request, response, sessionOptions)` and redirects to `/admin/login` if not logged in. `src/app/admin/(protected)/layout.tsx` re-checks and redirects too (defense-in-depth — middleware also protects any future Route Handlers, which a layout-only check never would) and renders the nav/logout chrome. The `(protected)` route group is required, not cosmetic: a single top-level `admin/layout.tsx` doing the redirect would also wrap `admin/login/page.tsx`, causing a redirect loop.
+
+`src/lib/session.ts` deliberately has no `next/headers` import (must stay Edge Runtime-safe so `middleware.ts` can import it); `src/lib/get-session.ts` (which does import `next/headers`) is Server Component/Action/Route Handler-only. Passwords are hashed with Node's built-in `scryptSync`/`timingSafeEqual` (`src/lib/password.ts`) — zero new dependency; run `npm run auth:hash -- <password>` to generate the `ADMIN_PASSWORD_HASH` value for `.env.local`. `SESSION_SECRET` (iron-session's cookie-sealing key, ≥32 chars, enforced by the library at runtime) is a separate env var from `ADMIN_PASSWORD_HASH` — don't confuse the two.
+
+The data layer mirrors the public booking split by read vs. write, not by entity: `src/lib/admin-queries.ts` (reads — `getAppointmentsInRange` with an optional status filter, `getAllBlockedTimes`, `getAllServices` including inactive rows) and `src/lib/admin-repo.ts` (writes, plus the pure `validAppointmentTransitions`/`canTransitionAppointmentStatus` guard, unit-tested in `admin-repo.test.ts`). Status-transition rule: from `pending`/`confirmed`, an admin can jump directly to any of `confirmed`/`completed`/`cancelled`/`no_show` — no forced staging through `confirmed` first; terminal statuses have zero valid transitions. `src/lib/admin-actions.ts` holds every admin Server Action. Blocked-time creation *warns*, it doesn't hard-block, on overlap with an existing pending/confirmed appointment, via a two-step confirm-anyway round trip mirroring the public booking flow's `slot_taken` pattern. None of these writes need `asNeonDbError`: `services`/`blocked_times` have no exclusion or uniqueness constraint an admin write could trip, and a `pending`↔`confirmed` status UPDATE can never trigger the appointments exclusion constraint since both statuses are already inside its `WHERE` predicate.
+
+`formDataToObject` (FormData → `Record<string,string>`) lives in `src/lib/form-data.ts`, not in `actions.ts` — a file with a top-level `"use server"` directive can only export async Server Actions, so a shared plain helper has to live outside it; `actions.ts`, `auth-actions.ts`, and `admin-actions.ts` all import it from there.
 
 ## Migrations
 

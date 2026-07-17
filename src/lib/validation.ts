@@ -59,3 +59,80 @@ export const cancelFormSchema = z.object({
 });
 
 export type CancelFormInput = z.infer<typeof cancelFormSchema>;
+
+// ---- Admin schemas below (Phase 4) ----
+
+export const loginSchema = z.object({
+  username: z.string().trim().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
+
+export const appointmentStatusSchema = z.enum(["pending", "confirmed", "completed", "cancelled", "no_show"]);
+
+export const updateAppointmentStatusFormSchema = z.object({
+  appointmentId: z.uuid(),
+  newStatus: appointmentStatusSchema,
+});
+
+// Date-range shape (not single-day+time-pair) so a multi-day holiday doesn't
+// need one row per day. Comparing "YYYY-MM-DDTHH:MM" strings lexicographically
+// is valid here since both halves are zero-padded ISO-like fields.
+export const blockedTimeFormSchema = z
+  .object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a start date"),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Pick a start time"),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick an end date"),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Pick an end time"),
+    reason: z
+      .string()
+      .trim()
+      .transform((v) => (v === "" ? undefined : v))
+      .pipe(z.string().max(200, "Keep the reason under 200 characters").optional()),
+    // Present ("true") only on the resubmit-after-overlap-warning round trip.
+    confirmOverlap: z.string().optional(),
+  })
+  .refine((d) => `${d.endDate}T${d.endTime}` > `${d.startDate}T${d.startTime}`, {
+    message: "End must be after start",
+    path: ["endTime"],
+  });
+
+export type BlockedTimeFormInput = z.infer<typeof blockedTimeFormSchema>;
+
+// FormData values arrive as strings — z.coerce.number() parses them.
+export const serviceFormSchema = z.object({
+  name: z.string().trim().min(2, "Enter a service name").max(100),
+  durationMin: z.coerce.number().int().positive().max(480, "Keep duration under 8 hours"),
+  pricePhp: z.coerce.number().int().nonnegative().max(1_000_000, "Enter a realistic price"),
+});
+
+export type ServiceFormInput = z.infer<typeof serviceFormSchema>;
+
+export const serviceIdSchema = z.object({ serviceId: z.uuid() });
+
+// `closed` must be a real boolean by the time this runs (see the admin
+// action's FormData mapping) — deliberately NOT z.coerce.boolean(), which
+// would coerce the string "false" to true and silently corrupt every open day.
+const openHoursDayInputSchema = z
+  .object({
+    closed: z.boolean(),
+    open: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    close: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  })
+  .refine((d) => d.closed || (!!d.open && !!d.close && d.close > d.open), {
+    message: "Set an opening and closing time, or mark the day closed",
+    path: ["close"],
+  });
+
+export const clinicHoursFormSchema = z.object({
+  mon: openHoursDayInputSchema,
+  tue: openHoursDayInputSchema,
+  wed: openHoursDayInputSchema,
+  thu: openHoursDayInputSchema,
+  fri: openHoursDayInputSchema,
+  sat: openHoursDayInputSchema,
+  sun: openHoursDayInputSchema,
+});
+
+export type ClinicHoursFormInput = z.infer<typeof clinicHoursFormSchema>;

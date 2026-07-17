@@ -66,6 +66,22 @@ export function addDaysToManilaDate(date: ManilaDateString, days: number): Manil
   return `${shifted.getUTCFullYear()}-${pad2(shifted.getUTCMonth() + 1)}-${pad2(shifted.getUTCDate())}`;
 }
 
+const WEEKDAY_OFFSET_FROM_MONDAY: Record<Weekday, number> = {
+  mon: 0,
+  tue: 1,
+  wed: 2,
+  thu: 3,
+  fri: 4,
+  sat: 5,
+  sun: 6,
+};
+
+// The Monday (inclusive) of the Manila calendar week containing `date` — the
+// admin week view's default anchor.
+export function mondayOfManilaWeek(date: ManilaDateString): ManilaDateString {
+  return addDaysToManilaDate(date, -WEEKDAY_OFFSET_FROM_MONDAY[manilaWeekday(date)]);
+}
+
 // "2026-07-15" -> "Wed, Jul 15". Anchored at UTC midnight purely to reuse
 // Intl's formatting with an explicit timeZone: "UTC" pin — there's no actual
 // zone conversion happening, just extracting the same y/m/d the string

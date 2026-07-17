@@ -3,6 +3,7 @@
 import { db } from "@/db/client";
 import { getServiceById, getSlotsForDate } from "./booking-queries";
 import { cancelAppointmentByRefAndMobile, insertAppointment } from "./booking-repo";
+import { formDataToObject } from "./form-data";
 import type { AvailableSlot } from "./slots";
 import { formatTimeLabel, manilaDateTimeToUtc, manilaTimeToUrlSegment, utcToManilaTimeString } from "./timezone";
 import { bookingFormSchema, cancelFormSchema } from "./validation";
@@ -31,12 +32,6 @@ function toSlotOptions(slots: AvailableSlot[]): SlotOption[] {
     const time = utcToManilaTimeString(s.start);
     return { time, timeSegment: manilaTimeToUrlSegment(time), label: formatTimeLabel(time) };
   });
-}
-
-function formDataToObject(formData: FormData, keys: string[]): Record<string, string> {
-  const obj: Record<string, string> = {};
-  for (const key of keys) obj[key] = String(formData.get(key) ?? "");
-  return obj;
 }
 
 export async function createBooking(
