@@ -1,23 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { login, type LoginState } from "@/lib/auth-actions";
 
 const initialState: LoginState = { status: "idle" };
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending} className="h-12 w-full text-base">
-      {pending ? "Signing in..." : "Sign in"}
-    </Button>
-  );
-}
 
 export function LoginForm() {
   const [state, formAction] = useActionState(login, initialState);
@@ -67,7 +57,7 @@ export function LoginForm() {
         ))}
       </div>
 
-      <SubmitButton />
+      <SubmitButton label="Sign in" pendingLabel="Signing in..." className="h-12 w-full text-base" />
     </form>
   );
 }

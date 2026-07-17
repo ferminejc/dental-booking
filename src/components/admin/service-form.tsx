@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { useFormStatus } from "react-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,18 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { createServiceAction, updateServiceAction, type ServiceFormState } from "@/lib/admin-actions";
 
 const initialState: ServiceFormState = { status: "idle" };
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending} className="w-full">
-      {pending ? "Saving..." : "Save"}
-    </Button>
-  );
-}
 
 interface ServiceFormProps {
   mode: "create" | "edit";
@@ -115,7 +106,7 @@ export function ServiceForm({ mode, service }: ServiceFormProps) {
             </Alert>
           )}
 
-          <SubmitButton />
+          <SubmitButton label="Save" pendingLabel="Saving..." className="w-full" />
         </form>
       </DialogContent>
     </Dialog>

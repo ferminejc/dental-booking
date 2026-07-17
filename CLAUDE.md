@@ -8,6 +8,8 @@ Online appointment booking for a small PH dental clinic. Full requirements, data
 
 **Status: Phases 1–4.** Scaffold, DB schema, migrations, seed script, the pure slot-generation engine (`src/lib/slots.ts` + `src/lib/timezone.ts`), the public booking flow end-to-end (services list, date/slot picker, booking form, cancel form, Server Actions in `src/lib/actions.ts`, Zod validation in `src/lib/validation.ts`), and the admin auth + dashboard (`/admin/*` — iron-session login, appointment list/week view with status transitions, blocked-time management, services CRUD, weekly clinic-hours editor; see "Admin auth + dashboard" below) all exist, with a Vitest unit suite plus one integration test (`src/lib/booking-repo.integration.test.ts`) that fires two concurrent bookings for the same slot against a real test database and asserts the exclusion constraint stops the second. There are no notifications and no E2E tests yet. Don't assume any of that exists — check before referencing it.
 
+**Known gap, deliberately deferred:** the DB read/write functions in `src/lib/booking-queries.ts` (`getActiveServices`, `getServiceById`, `getClinicSettings`, `fetchBlockersInRange`, `getAvailableDatesForService`), `src/lib/booking-repo.ts`'s `cancelAppointmentByRefAndMobile`, and all of `src/lib/admin-queries.ts`/`src/lib/admin-repo.ts` have **zero automated test coverage** (only the pure logic they call into — `generateAvailableSlots`, the status-transition guard — is tested). This was surfaced in a full-repo best-practices audit and explicitly deferred to a future session rather than silently left unaddressed; a good next step is integration tests in the style of `booking-repo.integration.test.ts`.
+
 ## Commands
 
 ```bash

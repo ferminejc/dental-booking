@@ -2,23 +2,13 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { cancelBooking, type CancelBookingState } from "@/lib/actions";
 
 const initialState: CancelBookingState = { status: "idle" };
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending} className="h-12 w-full text-base">
-      {pending ? "Cancelling..." : "Cancel booking"}
-    </Button>
-  );
-}
 
 export function CancelForm() {
   const [state, formAction] = useActionState(cancelBooking, initialState);
@@ -90,7 +80,7 @@ export function CancelForm() {
         ))}
       </div>
 
-      <SubmitButton />
+      <SubmitButton label="Cancel booking" pendingLabel="Cancelling..." className="h-12 w-full text-base" />
     </form>
   );
 }

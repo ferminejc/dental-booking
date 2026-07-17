@@ -10,6 +10,11 @@ export interface OpenHoursDay {
 export type OpenHours = Record<Weekday, OpenHoursDay | null>;
 
 // Only pending/confirmed appointments count against availability.
+// Deliberately duplicates db/schema.ts's appointmentStatusEnum values rather
+// than importing it — generateAvailableSlots is a pure function with zero DB
+// imports (per CLAUDE.md's "Slot-generation engine" section), so the two
+// lists are kept in sync by convention, same tradeoff as OpenHours vs.
+// clinic_settings.open_hours (see CLAUDE.md's Data Model section).
 export type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
 
 export interface ExistingAppointment {

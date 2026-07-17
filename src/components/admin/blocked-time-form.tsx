@@ -1,24 +1,14 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useFormStatus } from "react-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 import { createBlockedTimeAction, type CreateBlockedTimeState } from "@/lib/admin-actions";
 
 const initialState: CreateBlockedTimeState = { status: "idle" };
-
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Saving..." : label}
-    </Button>
-  );
-}
 
 export function BlockedTimeForm() {
   const [state, formAction] = useActionState(createBlockedTimeAction, initialState);
@@ -139,7 +129,10 @@ export function BlockedTimeForm() {
 
       {state.status === "overlap_warning" && <input type="hidden" name="confirmOverlap" value="true" />}
 
-      <SubmitButton label={state.status === "overlap_warning" ? "Create anyway" : "Block this time"} />
+      <SubmitButton
+        label={state.status === "overlap_warning" ? "Create anyway" : "Block this time"}
+        pendingLabel="Saving..."
+      />
     </form>
   );
 }

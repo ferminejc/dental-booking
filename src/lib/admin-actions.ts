@@ -13,6 +13,7 @@ import {
 } from "./admin-repo";
 import { getAppointmentsInRange } from "./admin-queries";
 import { formDataToObject } from "./form-data";
+import { requireAdminSession } from "./get-session";
 import type { OpenHours } from "./slots";
 import {
   formatDateLabel,
@@ -54,6 +55,8 @@ export async function updateAppointmentStatusAction(
   _prevState: UpdateAppointmentStatusState,
   formData: FormData,
 ): Promise<UpdateAppointmentStatusState> {
+  await requireAdminSession();
+
   const raw = formDataToObject(formData, ["appointmentId", "newStatus"]);
   const parsed = updateAppointmentStatusFormSchema.safeParse(raw);
   if (!parsed.success) return { status: "invalid" };
@@ -88,6 +91,8 @@ export async function createBlockedTimeAction(
   _prevState: CreateBlockedTimeState,
   formData: FormData,
 ): Promise<CreateBlockedTimeState> {
+  await requireAdminSession();
+
   const raw = formDataToObject(formData, ["startDate", "startTime", "endDate", "endTime", "reason", "confirmOverlap"]);
   const parsed = blockedTimeFormSchema.safeParse(raw);
   if (!parsed.success) {
@@ -123,6 +128,8 @@ export async function createBlockedTimeAction(
 }
 
 export async function deleteBlockedTimeAction(formData: FormData): Promise<void> {
+  await requireAdminSession();
+
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   await deleteBlockedTime(db, id);
@@ -140,6 +147,8 @@ export async function createServiceAction(
   _prevState: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
+  await requireAdminSession();
+
   const raw = formDataToObject(formData, ["name", "durationMin", "pricePhp"]);
   const parsed = serviceFormSchema.safeParse(raw);
   if (!parsed.success) {
@@ -156,6 +165,8 @@ export async function updateServiceAction(
   _prevState: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
+  await requireAdminSession();
+
   const raw = formDataToObject(formData, ["serviceId", "name", "durationMin", "pricePhp"]);
   const idParsed = serviceIdSchema.safeParse(raw);
   const parsed = serviceFormSchema.safeParse(raw);
@@ -171,6 +182,8 @@ export async function updateServiceAction(
 }
 
 export async function setServiceActiveAction(formData: FormData): Promise<void> {
+  await requireAdminSession();
+
   const raw = formDataToObject(formData, ["serviceId", "active"]);
   const parsed = serviceIdSchema.safeParse(raw);
   if (!parsed.success) return;
@@ -209,6 +222,8 @@ export async function updateClinicHoursAction(
   _prevState: ClinicHoursFormState,
   formData: FormData,
 ): Promise<ClinicHoursFormState> {
+  await requireAdminSession();
+
   const raw = formDataToClinicHoursInput(formData);
   const parsed = clinicHoursFormSchema.safeParse(raw);
   if (!parsed.success) {
