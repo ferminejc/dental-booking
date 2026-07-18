@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/db/client";
 import { getAppointmentsInRange } from "@/lib/admin-queries";
-import { notificationService } from "@/lib/notifications";
+import { notificationService, notifyBestEffort } from "@/lib/notifications";
 import { addDaysToManilaDate, manilaDateTimeToUtc, utcToManilaDateString } from "@/lib/timezone";
 
 // Checked per-request, not at module load — an unset/misconfigured
@@ -21,16 +21,24 @@ export async function GET(request: NextRequest) {
   const startUtc = manilaDateTimeToUtc(tomorrow, "00:00");
   const endUtc = manilaDateTimeToUtc(addDaysToManilaDate(tomorrow, 1), "00:00");
 
-  const appointmentsTomorrow = await getAppointmentsInRange(db, {
+  const candidates = await getAppointmentsInRange(db, {
     startUtc,
     endUtc,
     statuses: ["pending", "confirmed"],
   });
 
+  // getAppointmentsInRange checks range *overlap*, not "starts on this
+  // Manila calendar day" — a service crossing midnight could otherwise
+  // start today and still overlap tomorrow's window, sending a "tomorrow"
+  // reminder for an appointment that's actually tonight. Not reachable with
+  // today's seeded clinic hours (none allow crossing midnight), but not
+  // guarded against otherwise, so filter explicitly rather than assume it.
+  const appointmentsTomorrow = candidates.filter((appt) => utcToManilaDateString(appt.startsAt) === tomorrow);
+
   let remindersSent = 0;
   for (const appt of appointmentsTomorrow) {
-    try {
-      await notificationService.sendReminder({
+    const sent = await notifyBestEffort(`sendReminder(${appt.refCode})`, () =>
+      notificationService.sendReminder({
         refCode: appt.refCode,
         patientName: appt.patientName,
         patientMobile: appt.patientMobile,
@@ -38,11 +46,9 @@ export async function GET(request: NextRequest) {
         serviceName: appt.serviceName,
         startsAt: appt.startsAt,
         endsAt: appt.endsAt,
-      });
-      remindersSent++;
-    } catch (err) {
-      console.error(`[cron/reminders] sendReminder failed for ${appt.refCode}:`, err);
-    }
+      }),
+    );
+    if (sent) remindersSent++;
   }
 
   return NextResponse.json({ ok: true, remindersSent, total: appointmentsTomorrow.length });

@@ -13,11 +13,16 @@ export const notificationService: NotificationService = process.env.RESEND_API_K
 
 // Every call site (Server Actions, the cron route) goes through this — a
 // Resend outage/bug must never surface as a failure of a booking,
-// cancellation, or status change that already succeeded in the DB.
-export async function notifyBestEffort(label: string, fn: () => Promise<void>): Promise<void> {
+// cancellation, or status change that already succeeded in the DB. Returns
+// whether the notification completed without throwing, so callers that need
+// a count (the cron route's remindersSent) don't have to reimplement their
+// own try/catch around it.
+export async function notifyBestEffort(label: string, fn: () => Promise<void>): Promise<boolean> {
   try {
     await fn();
+    return true;
   } catch (err) {
     console.error(`[notifications] ${label} failed:`, err);
+    return false;
   }
 }
