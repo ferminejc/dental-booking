@@ -71,7 +71,16 @@ export async function insertAppointment(
 }
 
 export type CancelResult =
-  | { ok: true }
+  | {
+      ok: true;
+      refCode: string;
+      patientName: string;
+      patientMobile: string;
+      patientEmail: string | null;
+      serviceId: string;
+      startsAt: Date;
+      endsAt: Date;
+    }
   | { ok: false; reason: "not_found" }
   | { ok: false; reason: "already_resolved"; status: AppointmentStatus };
 
@@ -91,5 +100,14 @@ export async function cancelAppointmentByRefAndMobile(
     return { ok: false, reason: "already_resolved", status: appt.status };
   }
   await client.update(appointments).set({ status: "cancelled" }).where(eq(appointments.id, appt.id));
-  return { ok: true };
+  return {
+    ok: true,
+    refCode: appt.refCode,
+    patientName: appt.patientName,
+    patientMobile: appt.patientMobile,
+    patientEmail: appt.patientEmail,
+    serviceId: appt.serviceId,
+    startsAt: appt.startsAt,
+    endsAt: appt.endsAt,
+  };
 }

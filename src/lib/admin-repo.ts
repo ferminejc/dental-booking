@@ -21,7 +21,16 @@ export function canTransitionAppointmentStatus(current: AppointmentStatus, next:
 }
 
 export type UpdateStatusResult =
-  | { ok: true }
+  | {
+      ok: true;
+      refCode: string;
+      patientName: string;
+      patientMobile: string;
+      patientEmail: string | null;
+      serviceId: string;
+      startsAt: Date;
+      endsAt: Date;
+    }
   | { ok: false; reason: "not_found" }
   | { ok: false; reason: "invalid_transition"; currentStatus: AppointmentStatus };
 
@@ -45,8 +54,21 @@ export async function updateAppointmentStatus(
     return { ok: false, reason: "invalid_transition", currentStatus: appt.status };
   }
 
-  await client.update(appointments).set({ status: newStatus }).where(eq(appointments.id, appointmentId));
-  return { ok: true };
+  const [updated] = await client
+    .update(appointments)
+    .set({ status: newStatus })
+    .where(eq(appointments.id, appointmentId))
+    .returning({
+      refCode: appointments.refCode,
+      patientName: appointments.patientName,
+      patientMobile: appointments.patientMobile,
+      patientEmail: appointments.patientEmail,
+      serviceId: appointments.serviceId,
+      startsAt: appointments.startsAt,
+      endsAt: appointments.endsAt,
+    });
+
+  return { ok: true, ...updated };
 }
 
 export interface NewBlockedTimeInput {

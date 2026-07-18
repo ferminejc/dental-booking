@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { getServiceById, getSlotsForDate } from "./booking-queries";
 import { cancelAppointmentByRefAndMobile, insertAppointment } from "./booking-repo";
 import { formDataToObject } from "./form-data";
+import { notificationService, notifyBestEffort } from "./notifications";
 import type { AvailableSlot } from "./slots";
 import { formatTimeLabel, manilaDateTimeToUtc, manilaTimeToUrlSegment, utcToManilaTimeString } from "./timezone";
 import { bookingFormSchema, cancelFormSchema } from "./validation";
@@ -105,6 +106,18 @@ export async function createBooking(
     return { status: "error", message: "Something went wrong on our end. Please try again." };
   }
 
+  await notifyBestEffort("sendBookingReceived", () =>
+    notificationService.sendBookingReceived({
+      refCode: result.refCode,
+      patientName: input.patientName,
+      patientMobile: input.patientMobile,
+      patientEmail: input.patientEmail,
+      serviceName: service.name,
+      startsAt,
+      endsAt,
+    }),
+  );
+
   return { status: "success", refCode: result.refCode };
 }
 
@@ -142,6 +155,18 @@ export async function cancelBooking(
   const result = await cancelAppointmentByRefAndMobile(db, parsed.data.refCode, parsed.data.patientMobile);
 
   if (result.ok) {
+    const service = await getServiceById(db, result.serviceId);
+    await notifyBestEffort("sendCancelled", () =>
+      notificationService.sendCancelled({
+        refCode: result.refCode,
+        patientName: result.patientName,
+        patientMobile: result.patientMobile,
+        patientEmail: result.patientEmail ?? undefined,
+        serviceName: service?.name ?? "your appointment",
+        startsAt: result.startsAt,
+        endsAt: result.endsAt,
+      }),
+    );
     return { status: "success" };
   }
   if (result.reason === "not_found") {

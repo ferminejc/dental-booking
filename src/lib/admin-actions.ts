@@ -12,8 +12,10 @@ import {
   updateService,
 } from "./admin-repo";
 import { getAppointmentsInRange } from "./admin-queries";
+import { getServiceById } from "./booking-queries";
 import { formDataToObject } from "./form-data";
 import { requireAdminSession } from "./get-session";
+import { notificationService, notifyBestEffort, type NotificationPayload } from "./notifications";
 import type { OpenHours } from "./slots";
 import {
   formatDateLabel,
@@ -64,6 +66,25 @@ export async function updateAppointmentStatusAction(
   const result = await updateAppointmentStatus(db, parsed.data.appointmentId, parsed.data.newStatus);
   if (result.ok) {
     revalidatePath("/admin");
+
+    if (parsed.data.newStatus === "confirmed" || parsed.data.newStatus === "cancelled") {
+      const service = await getServiceById(db, result.serviceId);
+      const payload: NotificationPayload = {
+        refCode: result.refCode,
+        patientName: result.patientName,
+        patientMobile: result.patientMobile,
+        patientEmail: result.patientEmail ?? undefined,
+        serviceName: service?.name ?? "your appointment",
+        startsAt: result.startsAt,
+        endsAt: result.endsAt,
+      };
+      if (parsed.data.newStatus === "confirmed") {
+        await notifyBestEffort("sendConfirmed", () => notificationService.sendConfirmed(payload));
+      } else {
+        await notifyBestEffort("sendCancelled", () => notificationService.sendCancelled(payload));
+      }
+    }
+
     return { status: "success" };
   }
   if (result.reason === "not_found") return { status: "not_found" };
